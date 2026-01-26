@@ -1,0 +1,79 @@
+# Example: Node.js Express Application
+app:
+  name: express-api
+  type: service
+  language: nodejs
+  version: 1.0.0
+
+build:
+  builder: cnb
+  cnb:
+    builder: paketobuildpacks/builder:base
+    env:
+      BP_NODE_VERSION: "20"
+      BP_NPM_INSTALL_ARGS: "--production"
+  image:
+    registry: docker.io
+    namespace: myorg
+    name: express-api
+    tags:
+      - "${GIT_COMMIT_SHORT}"
+      - "${GIT_BRANCH}"
+      - "latest"
+
+stages:
+  lint:
+    enabled: true
+    commands:
+      - language: nodejs
+        cmd: npm run lint
+
+  test:
+    enabled: true
+    commands:
+      - language: nodejs
+        cmd: npm test -- --coverage --coverageReporters=text --coverageReporters=lcov
+    coverage:
+      enabled: true
+      threshold: 70
+      report: coverage/lcov.info
+
+  sast:
+    enabled: true
+    sonarqube:
+      enabled: true
+      projectKey: express-api
+      sources: src/
+      qualityGate: true
+    trivy:
+      enabled: true
+
+  dependency_scan:
+    enabled: true
+    tools:
+      - trivy
+      - owasp-dependency-check
+    fail_on: CRITICAL
+
+  build:
+    enabled: true
+
+  image_scan:
+    enabled: true
+    severity: HIGH,CRITICAL
+    fail_on: CRITICAL
+
+  push:
+    enabled: true
+
+notifications:
+  slack:
+    enabled: false
+    channel: "#deployments"
+    events:
+      - build_failure
+
+advanced:
+  timeout: 30
+  workspace:
+    cleanup: true

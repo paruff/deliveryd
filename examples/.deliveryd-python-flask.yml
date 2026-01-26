@@ -1,0 +1,75 @@
+# Example: Python Flask Application
+app:
+  name: flask-api
+  type: service
+  language: python
+  version: 1.0.0
+
+build:
+  builder: cnb
+  cnb:
+    builder: paketobuildpacks/builder:base
+    env:
+      BP_CPYTHON_VERSION: "3.11"
+  image:
+    registry: docker.io
+    namespace: myorg
+    name: flask-api
+    tags:
+      - "${GIT_COMMIT_SHORT}"
+      - "latest"
+
+stages:
+  lint:
+    enabled: true
+    commands:
+      - language: python
+        cmd: |
+          pip install pylint black flake8
+          pylint src/ --fail-under=8.0
+          black --check src/
+          flake8 src/
+
+  test:
+    enabled: true
+    commands:
+      - language: python
+        cmd: |
+          pip install pytest pytest-cov
+          pytest tests/ --cov=src --cov-report=xml --cov-report=html
+    coverage:
+      enabled: true
+      threshold: 75
+      report: coverage.xml
+
+  sast:
+    enabled: true
+    sonarqube:
+      enabled: true
+      projectKey: flask-api
+      sources: src/
+      qualityGate: true
+    trivy:
+      enabled: true
+
+  dependency_scan:
+    enabled: true
+    tools:
+      - trivy
+    fail_on: HIGH
+
+  build:
+    enabled: true
+
+  image_scan:
+    enabled: true
+    severity: CRITICAL
+    fail_on: CRITICAL
+
+  push:
+    enabled: true
+
+advanced:
+  timeout: 30
+  workspace:
+    cleanup: true
