@@ -44,7 +44,11 @@ spec:
               name: dockerhub-credentials
               key: token
         - name: JENKINS_ADMIN_USER
-          value: "admin"
+          valueFrom:
+            secretKeyRef:
+              name: jenkins-admin
+              key: username
+              optional: true
         - name: JENKINS_ADMIN_PASSWORD
           valueFrom:
             secretKeyRef:
@@ -81,6 +85,12 @@ spec:
       - name: jenkins-home
         persistentVolumeClaim:
           claimName: jenkins-pvc
+      # WARNING: Mounting Docker socket poses security risks
+      # For production, consider:
+      # 1. Docker-in-Docker (DinD) sidecar container
+      # 2. Kaniko for building images without Docker
+      # 3. Kubernetes-native builders (e.g., Tekton, BuildKit)
+      # See: https://jpetazzo.github.io/2015/09/03/do-not-use-docker-in-docker-for-ci/
       - name: docker-sock
         hostPath:
           path: /var/run/docker.sock

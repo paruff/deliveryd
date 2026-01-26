@@ -25,6 +25,7 @@ This directory contains Kubernetes manifests for deploying deliveryd to a Kubern
      -n deliveryd
    
    kubectl create secret generic jenkins-admin \
+     --from-literal=username=admin \
      --from-literal=password=your-secure-password \
      -n deliveryd
    ```
@@ -47,6 +48,11 @@ This directory contains Kubernetes manifests for deploying deliveryd to a Kubern
 - Adjust storage class in `jenkins-pvc.yaml` for your cluster
 - The Jenkins image (`deliveryd/jenkins:latest`) needs to be built and pushed to a registry
 - For production, enable TLS in ingress and use cert-manager
+- **Security Warning**: The deployment uses Docker socket mounting which grants root access to the host. For production environments, consider:
+  - Docker-in-Docker (DinD) sidecar containers
+  - Kaniko for building images without Docker
+  - Kubernetes-native builders (Tekton, BuildKit)
+  - See: https://jpetazzo.github.io/2015/09/03/do-not-use-docker-in-docker-for-ci/
 
 ## Building and Pushing Custom Image
 

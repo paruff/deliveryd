@@ -6,6 +6,10 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
+# Constants
+DEFAULT_DOCKERHUB_USERNAME="your-dockerhub-username"
+DEFAULT_DOCKERHUB_TOKEN="your-dockerhub-token-or-password"
+
 echo "========================================="
 echo "deliveryd Platform Validation"
 echo "========================================="
@@ -200,7 +204,8 @@ if [ -f ".env" ]; then
     for var in "${required_vars[@]}"; do
         if grep -q "^${var}=" .env; then
             value=$(grep "^${var}=" .env | cut -d= -f2-)
-            if [ "$value" == "your-dockerhub-username" ] || [ "$value" == "your-dockerhub-token-or-password" ]; then
+            # Check against constants
+            if [ "$value" == "$DEFAULT_DOCKERHUB_USERNAME" ] || [ "$value" == "$DEFAULT_DOCKERHUB_TOKEN" ]; then
                 warning "$var is set to default value, please update .env"
             else
                 success "$var is configured"
