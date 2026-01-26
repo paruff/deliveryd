@@ -41,7 +41,11 @@ ps: status ## Alias for status
 
 health: ## Check health of all services
 	@echo "🏥 Checking service health..."
-	@docker-compose ps --format json | jq -r '.[] | "\(.Name): \(.Status)"'
+	@if command -v jq &> /dev/null; then \
+		docker-compose ps --format json | jq -r '.[] | "\(.Name): \(.Status)"'; \
+	else \
+		docker-compose ps; \
+	fi
 
 build: ## Build custom images
 	@echo "🏗️  Building custom images..."
@@ -107,9 +111,21 @@ dev: ## Start in development mode with logs
 
 test-webhook: ## Test webhook endpoint (requires jq)
 	@echo "🔔 Testing webhook endpoint..."
-	@curl -X POST "http://localhost:8080/jenkins/generic-webhook-trigger/invoke" \
-		-H "Content-Type: application/json" \
-		-d '{"test": "true", "webhook_secret": "changeme"}' | jq .
+	@if [ -f .env ]; then \
+		WEBHOOK_SECRET=$$(grep "^WEBHOOK_SECRET=" .env | cut -d= -f2-); \
+	else \
+		WEBHOOK_SECRET="changeme"; \
+		echo "⚠️  Using default webhook secret. Configure .env for actual secret."; \
+	fi; \
+	if command -v jq &> /dev/null; then \
+		curl -X POST "http://localhost:8080/jenkins/generic-webhook-trigger/invoke" \
+			-H "Content-Type: application/json" \
+			-d "{\"test\": \"true\", \"webhook_secret\": \"$$WEBHOOK_SECRET\"}" | jq .; \
+	else \
+		curl -X POST "http://localhost:8080/jenkins/generic-webhook-trigger/invoke" \
+			-H "Content-Type: application/json" \
+			-d "{\"test\": \"true\", \"webhook_secret\": \"$$WEBHOOK_SECRET\"}"; \
+	fi
 
 wait-for-jenkins: ## Wait for Jenkins to be ready
 	@echo "⏳ Waiting for Jenkins to be ready..."

@@ -91,7 +91,9 @@ echo ""
 # Validate YAML files
 echo "Validating YAML files..."
 if command -v python3 &> /dev/null; then
-    python3 << 'EOF'
+    # Check if PyYAML is available
+    if python3 -c "import yaml" 2>/dev/null; then
+        python3 << 'EOF'
 import yaml
 import sys
 
@@ -137,11 +139,14 @@ for file in k8s_files:
 sys.exit(0 if all_valid else 1)
 EOF
     
-    if [ $? -eq 0 ]; then
-        success "All YAML files are valid"
+        if [ $? -eq 0 ]; then
+            success "All YAML files are valid"
+        else
+            error "Some YAML files have errors"
+            exit 1
+        fi
     else
-        error "Some YAML files have errors"
-        exit 1
+        warning "PyYAML not available, skipping YAML validation. Install with: pip3 install pyyaml"
     fi
 else
     warning "Python3 not available, skipping YAML validation"
