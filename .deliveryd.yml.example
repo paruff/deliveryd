@@ -1,0 +1,170 @@
+# deliveryd Pipeline Contract Specification
+# Version: 1.0.0
+#
+# This file defines the contract between your application repository and the deliveryd CI/CD platform.
+# Place this file at the root of your repository as .deliveryd.yml
+
+# Application metadata
+app:
+  name: my-application          # Application name (required)
+  type: service                 # Type: service, library, cli, frontend (required)
+  language: java                # Primary language: java, python, nodejs, go, ruby, etc. (required)
+  version: 1.0.0               # Semantic version (optional, can be auto-generated)
+
+# Build configuration
+build:
+  # Builder type: cnb (Cloud Native Buildpacks), docker, or custom
+  builder: cnb
+  
+  # CNB-specific configuration (used when builder: cnb)
+  cnb:
+    builder: paketobuildpacks/builder:base  # CNB builder image
+    buildpacks: []                           # Optional: specific buildpacks to use
+    env:                                     # Build-time environment variables
+      BP_JVM_VERSION: "17"
+      BP_MAVEN_BUILD_ARGUMENTS: "-DskipTests"
+  
+  # Docker-specific configuration (used when builder: docker)
+  docker:
+    dockerfile: Dockerfile
+    context: .
+    target: production                       # Multi-stage build target
+    buildArgs: {}                            # Build arguments
+  
+  # Image configuration
+  image:
+    registry: docker.io                      # Container registry
+    namespace: ${DOCKERHUB_USERNAME}         # Registry namespace/organization
+    name: ${APP_NAME}                        # Image name (defaults to app.name)
+    tags:                                    # Tag strategy
+      - "${GIT_COMMIT_SHORT}"
+      - "${GIT_BRANCH}"
+      - "latest"
+
+# Pipeline stages configuration
+stages:
+  # Lint stage - Code quality and style checks
+  lint:
+    enabled: true
+    commands:
+      - language: java
+        cmd: mvn checkstyle:check spotbugs:check
+      - language: python
+        cmd: pylint src/ && black --check src/
+      - language: nodejs
+        cmd: npm run lint
+      - language: go
+        cmd: golangci-lint run
+    dockerfile:
+      enabled: true                          # Enable Dockerfile linting with hadolint
+  
+  # Unit test stage
+  test:
+    enabled: true
+    commands:
+      - language: java
+        cmd: mvn test
+      - language: python
+        cmd: pytest tests/ --cov=src --cov-report=xml
+      - language: nodejs
+        cmd: npm test -- --coverage
+      - language: go
+        cmd: go test -v -cover ./...
+    coverage:
+      enabled: true
+      threshold: 80                          # Minimum coverage percentage
+      report: coverage.xml                   # Coverage report file
+  
+  # SAST (Static Application Security Testing)
+  sast:
+    enabled: true
+    sonarqube:
+      enabled: true
+      projectKey: ${APP_NAME}
+      sources: src/
+      exclusions: "**/test/**,**/tests/**"
+      qualityGate: true                      # Wait for quality gate result
+    # Additional SAST tools
+    trivy:
+      enabled: true                          # Trivy filesystem scan
+      severity: HIGH,CRITICAL
+  
+  # Dependency vulnerability scanning
+  dependency_scan:
+    enabled: true
+    tools:
+      - owasp-dependency-check               # OWASP Dependency-Check
+      - trivy                                # Trivy dependency scan
+    fail_on: CRITICAL                        # Fail build on: CRITICAL, HIGH, MEDIUM, LOW
+    suppressions: dependency-check-suppressions.xml  # Optional suppressions file
+  
+  # Build stage (handled by builder configuration above)
+  build:
+    enabled: true
+    
+  # Container image scanning (post-build)
+  image_scan:
+    enabled: true
+    tools:
+      - trivy                                # Trivy image scan
+    severity: HIGH,CRITICAL
+    fail_on: CRITICAL
+  
+  # Push to registry
+  push:
+    enabled: true
+    registries:
+      - docker.io                            # Push to DockerHub by default
+    # Additional registries can be configured
+    # - ghcr.io
+    # - gcr.io
+    # - quay.io
+
+# Notification configuration
+notifications:
+  slack:
+    enabled: false
+    channel: "#ci-cd"
+    events:
+      - build_success
+      - build_failure
+      - deployment
+  email:
+    enabled: false
+    recipients:
+      - dev-team@example.com
+    events:
+      - build_failure
+
+# Kubernetes deployment configuration (for promotion path)
+kubernetes:
+  enabled: false                             # Enable K8s deployment
+  cluster: default                           # K8s cluster name
+  namespace: default                         # K8s namespace
+  manifests:
+    path: k8s/                               # Path to K8s manifests
+    files:                                   # Specific manifest files
+      - deployment.yaml
+      - service.yaml
+  helm:
+    enabled: false                           # Use Helm for deployment
+    chart: ./chart                           # Helm chart path
+    values: values.yaml                      # Values file
+    release: ${APP_NAME}                     # Helm release name
+
+# Advanced configuration
+advanced:
+  timeout: 60                                # Pipeline timeout in minutes
+  retry:
+    enabled: true
+    count: 2
+  parallel:
+    enabled: false                           # Run independent stages in parallel
+  artifacts:
+    paths:                                   # Paths to archive as artifacts
+      - target/*.jar
+      - dist/
+      - build/
+    retention: 30                            # Days to retain artifacts
+  workspace:
+    cleanup: true                            # Clean workspace after build

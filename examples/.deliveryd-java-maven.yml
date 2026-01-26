@@ -1,0 +1,86 @@
+# Example: Java Spring Boot Application with Maven
+app:
+  name: spring-boot-api
+  type: service
+  language: java
+  version: 1.0.0
+
+build:
+  builder: cnb
+  cnb:
+    builder: paketobuildpacks/builder:base
+    env:
+      BP_JVM_VERSION: "17"
+      BP_MAVEN_BUILD_ARGUMENTS: "-DskipTests=true -Dmaven.javadoc.skip=true"
+  image:
+    registry: docker.io
+    namespace: myorg
+    name: spring-boot-api
+    tags:
+      - "${GIT_COMMIT_SHORT}"
+      - "${GIT_BRANCH}"
+      - "latest"
+
+stages:
+  lint:
+    enabled: true
+    commands:
+      - language: java
+        cmd: mvn checkstyle:check
+    dockerfile:
+      enabled: true
+
+  test:
+    enabled: true
+    commands:
+      - language: java
+        cmd: mvn test
+    coverage:
+      enabled: true
+      threshold: 80
+      report: target/site/jacoco/jacoco.xml
+
+  sast:
+    enabled: true
+    sonarqube:
+      enabled: true
+      projectKey: spring-boot-api
+      sources: src/main/java
+      exclusions: "**/test/**"
+      qualityGate: true
+
+  dependency_scan:
+    enabled: true
+    tools:
+      - owasp-dependency-check
+      - trivy
+    fail_on: CRITICAL
+
+  build:
+    enabled: true
+
+  image_scan:
+    enabled: true
+    severity: HIGH,CRITICAL
+    fail_on: CRITICAL
+
+  push:
+    enabled: true
+
+kubernetes:
+  enabled: false
+  namespace: production
+  manifests:
+    path: k8s/
+    files:
+      - deployment.yaml
+      - service.yaml
+
+advanced:
+  timeout: 45
+  workspace:
+    cleanup: true
+  artifacts:
+    paths:
+      - target/*.jar
+    retention: 30

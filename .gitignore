@@ -1,0 +1,21 @@
+.DS_Store
+.env
+*.log
+*.swp
+*.bak
+*~
+
+# Shared workspace (used by pipelines)
+shared/*
+!shared/.gitkeep
+
+# Backup files
+backups/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# OS
+Thumbs.db
